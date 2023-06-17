@@ -1,11 +1,13 @@
 clc; close all; clear;tic
 %% read data
-fold_location = 'E:\作业2-数据';
-data_name = '\CSA-bridge.jpg';
+% fold_location = 'E:\作业2-数据';
+% data_name = '\CSA-bridge.jpg';
+fold_location = '/Users/weiyihai/中国科学院/中国科学院大学/国科大博一下学期资料数据/SAR信号处理与运动补偿22-23春季/作业/作业2-数据';
+data_name = '/CSA-bridge.jpg';
 filename = strcat(fold_location,data_name);
 % 读取图像
 img = imread(filename);
-normalizedImg=img;
+normalizedImg=rgb2gray(img);
 %% 中值滤波去噪
 % 将图像转换为灰度图像
 % grayImg = rgb2gray(img);
@@ -21,7 +23,14 @@ medianImg = medfilt2(grayImg, [filterSize filterSize]);
 %%
 % 对灰度图像进行直方图均衡化
 equalizedImg = histeq(medianImg);
-
+% % 计算灰度直方图
+% histogram = imhist(equalizedImg);
+% 
+% % 可视化直方图
+% bar(histogram);
+% title('灰度直方图');
+% xlabel('灰度级别');
+% ylabel('像素数');
 % 显示原始图像和均衡化后的图像
 % figure;
 % subplot(1, 2, 1);
@@ -33,7 +42,8 @@ equalizedImg = histeq(medianImg);
 %%
 % 显示原始图像和应用阈值后的图像
 T = graythresh(equalizedImg);
-thresholdImg = imbinarize(equalizedImg, T);
+sigm=otus(equalizedImg)/255;
+thresholdImg = imbinarize(equalizedImg, sigm);
 % figure;
 % subplot(1, 2, 1);
 % imshow(equalizedImg);
@@ -41,57 +51,47 @@ thresholdImg = imbinarize(equalizedImg, T);
 % subplot(1, 2, 2);
 % imshow(thresholdImg);
 % title(['阈值为 ' num2str(T)]);
-% bgImg=zeros(size(equalizedImg, 1),size(equalizedImg, 2));
-% fgImg=zeros(size(equalizedImg, 1),size(equalizedImg, 2));
-% 
-% % 遍历图像，将像素值大于阈值的像素保存到数组 bgImg 中，将像素值小于等于阈值的像素保存到数组 fgImg 中
-% for i = 1:size(equalizedImg, 1)
-%     for j = 1:size(equalizedImg, 2)
-%         if equalizedImg(i, j) > T*255
-%             bgImg(i,j) = equalizedImg(i, j);
-%         else
-%             fgImg(i,j) = equalizedImg(i, j);
-%         end
-%     end
-% end
-% % 对于灰度级在 [0, T] 的像素，使用 Otsu 准则求出分割阈值 T'
-% T1 = graythresh(fgImg);
 
 fgImg=[];
 for i = 1:size(equalizedImg, 1)
     for j = 1:size(equalizedImg, 2)
-        if equalizedImg(i, j) > T*255
+        if thresholdImg(i, j) ==1
         else
             fgImg(end+1) = equalizedImg(i, j);
         end
     end
 end
 
-% 计算灰度图像的直方图
-histCounts = imhist(fgImg/255);
-% 计算灰度图像像素的总数
-numPixels = numel(grayImg);
-% 构造灰度级别向量
-pixelVals = [0:255]';
-% 计算直方图的累积分布函数
-omega = cumsum(histCounts) / numPixels;
-% 计算灰度级别的平均值
-mu = cumsum(pixelVals .* histCounts) / numPixels;
-% 计算灰度级别的总平均值
-muT = mu(end);
-% 计算前景和背景的方差
-sigmaB = (muT * omega - mu).^2 ./ (omega .* (1 - omega));
-% 选择最大方差对应的灰度级别作为阈值
-[maxval, idx] = max(sigmaB);
-T1 = pixelVals(idx) / 255;
+sigm1=otus(fgImg)/255;
 
+finalImg = imbinarize(equalizedImg, sigm1);
+% figure;
+% subplot(1, 2, 1);
+% imshow(thresholdImg);
+% title(['T阈值为 ' num2str(T)]);
+% subplot(1, 2, 2);
+% imshow(finalImg);
+% title(['T’阈值为 ' num2str(sigm1)]);
 
-finalImg = imbinarize(equalizedImg, T1);
+%膨胀
+% se = strel('disk', 1); % 创建一个5像素半径的圆形结构元素
+se = strel('rectangle', [1 1]);
+eroded_img = imerode(finalImg, se);
+%腐蚀
+% se = strel('disk', 5); % 创建一个10像素半径的圆形结构元素
+% se = strel('rectangle', [5 5]);
+se = strel('line', 3, 0);
+dilated_img = imdilate(eroded_img, se);
+% 将图像求反并显示
+neg_dilated_img = imcomplement(dilated_img);
 figure;
-subplot(1, 2, 1);
-imshow(thresholdImg);
-title(['T阈值为 ' num2str(T)]);
-subplot(1, 2, 2);
-imshow(finalImg);
-title(['T’阈值为 ' num2str(T1)]);
+imshow(neg_dilated_img);
+
+
+% 进行连通域标记
+[L, num] = bwlabel(neg_dilated_img, 8);
+
+% 统计每个连通域的面积
+stats = regionprops('table', L, 'Area');
+areas = stats.Area;
 
