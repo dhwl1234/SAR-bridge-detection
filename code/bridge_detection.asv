@@ -106,52 +106,13 @@ stats = regionprops(label, 'Area');
 areas = [stats.Area];
 
 % 使用 Otsu 分析得到面积阈值
-level = (graythresh(uint8(areas)))*max(areas);
-delta  = 0.1*level;
+level = (graythresh(uint8(areas)))*size(areas,2);
+deta  = 0.1*size(areas,2);
 
 % 根据阈值剔除面积过小的连接分量
-bw_clean = ismember(label, find((areas>=level-3*delta)));
+bw_clean = ismember(label, find((areas>=max(areas)-deta) & (areas<=max(areas)+deta)));
 
 % 
-% % 显示结果
-% figure;
-% imshow(bw_clean);
-% figure;imshow(label);
-% 进行逻辑与运算
-bw_and = bw_clean & bw_closed;
-figure;imshow(bw_and);title('与逻辑运算');
-% 对二值图像进行形态学细化操作
-bw_thinned = bwmorph(bw_clean, 'thin', Inf);
-
-figure;imshow(bw_thinned);title('细化操作,提取主干线');
-% 将主干线连接在一起
-bw_filled = imfill(bw_thinned, 'holes');
-bw_filled = bwmorph(bw_filled, 'bridge');
-
-% 对河流边界线和河流主干线进行逻辑与运算，得到交点
-edges = edge(bw_clean, 'canny');
-figure;imshow(edges);title('提取河流边界线');
-
-% 将两张图像重叠显示在一张图上
+% 显示结果
 figure;
-imshow(bw_thinned);
-hold on;
-h = imshow(edges);
-set(h, 'AlphaData',0.4); % 设置边界线的透明度
-title('河流主干线和边界线重叠显示');
-intersection = bitand(edges, bw_thinned);
-
-% 对交点进行配对处理，确定每个桥梁的中心位置
-[rows, cols] = find(intersection);
-d = pdist([rows, cols]);
-idx = find(d < 20); % 这里的 20 是一个阈值，用于确定交点间的距离
-pairs = nchoosek(idx, 2);
-centers = (rows(pairs(:, 1)) + rows(pairs(:, 2))) / 2;
-
-
-
-
-
-
-
-
+imshow(bw_clean);
